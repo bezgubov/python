@@ -2,7 +2,9 @@
 
 import telnetlib
 import json
+import os
 
+hostname = os.uname()[1]
 host = "localhost"
 services = {"service1": 5050,
             "service2": 5051,
@@ -20,14 +22,16 @@ def get_json(host, port):
 def main():
     for port in services.keys():
         data = json.loads(get_json(host, services[port]))
-        print port
         statuses = {}
         for worker in data["workers"]:
             if worker["status"] in statuses:
                 statuses[worker["status"]] += 1
             else:
                 statuses[worker["status"]] = 1
-        print statuses
+        for status in statuses:
+            value = str(statuses[status])
+            print "%s uwsgi.stats[%s.workers.status.%s] %s" \
+                   % (hostname, port, status, value)
 
 
 if __name__ == "__main__":
