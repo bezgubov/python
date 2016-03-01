@@ -21,7 +21,10 @@ def get_json(host, port):
 
 def main():
     for port in services.keys():
-        data = json.loads(get_json(host, services[port]))
+        try:
+            data = json.loads(get_json(host, services[port]))
+        except:
+            continue
         statuses = {}
         for worker in data["workers"]:
             if worker["status"] in statuses:
