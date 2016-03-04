@@ -19,22 +19,45 @@ def get_json(host, port):
     return json
 
 
+def workers_status(data, port):
+    statuses = {"name": "workers.status"}
+    for worker in data["workers"]:
+        if worker["status"] in statuses:
+            statuses[worker["status"]] += 1
+        else:
+            statuses[worker["status"]] = 1
+    return statuses
+
+
+def workers_cores_in_request(data, port):
+    in_requests = {"name": "worker_cores.status",
+                   "idle_cores": 0,
+                   "busy_cores": 0}
+    for worker in data["workers"]:
+        for core in worker["cores"]:
+            if core["in_request"] == 0:
+                in_requests["idle_cores"] += 1
+            elif core["in_request"] == 1:
+                in_requests["busy_cores"] += 1
+    return in_requests
+
+
+def zabbix_data(hostname, port, metric):
+    metric_name = metric.pop("name")
+    for key, value in metric.iteritems():
+        print "%s uwsgi.stats[%s.%s.%s] %s" \
+               % (hostname, port, metric_name, key, value)
+
+
 def main():
     for port in services.keys():
         try:
             data = json.loads(get_json(host, services[port]))
         except:
             continue
-        statuses = {}
-        for worker in data["workers"]:
-            if worker["status"] in statuses:
-                statuses[worker["status"]] += 1
-            else:
-                statuses[worker["status"]] = 1
-        for status in statuses:
-            value = str(statuses[status])
-            print "%s uwsgi.stats[%s.workers.status.%s] %s" \
-                   % (hostname, port, status, value)
+
+        zabbix_data(hostname, port, workers_status(data, port))
+        zabbix_data(hostname, port, workers_cores_in_request(data, port))
 
 
 if __name__ == "__main__":
