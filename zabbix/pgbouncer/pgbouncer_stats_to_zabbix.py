@@ -31,7 +31,7 @@ def get_query(host, port, query):
     except psycopg2.DatabaseError, e:
         if con:
             con.rollback()
-        pass 
+        pass
 
     finally:
         if con:
@@ -41,42 +41,61 @@ def get_query(host, port, query):
 
 
 def get_data(rows):
-    user_list = {}
+    sum_status = {"idle": 0, "active": 0, "used": 0}
+    status_by_user = {}
 
     for row in rows:
         user = row[1]
         status = row[3]
 
-        if user not in user_list:
-            user_list[user] = {status: 1}
+        if user not in status_by_user:
+            status_by_user[user] = {status: 1}
+            sum_status[status] += 1
 
-        elif user in user_list:
-            if status not in user_list[user]:
-                user_list[user][status] = 1
-            elif status in user_list[user]:
-                user_list[user][status] += 1
+        elif user in status_by_user:
+            if status not in status_by_user[user]:
+                status_by_user[user][status] = 1
+                sum_status[status] = 1
+            elif status in status_by_user[user]:
+                status_by_user[user][status] += 1
+                sum_status[status] += 1
 
-    return user_list
+    return status_by_user, sum_status
 
 
-def zabbix_data(hostname, data):
+def zabbix_data_by_user(hostname, data):
     for port in data:
         for user in data[port]:
             for status in data[port][user]:
                 value = data[port][user][status]
                 print "%s pgbouncer.stats[%s.%s.%s] %s" \
-                           % (hostname, port, user, status, value)
+                       % (hostname, port, user, status, value)
+
+
+def zabbix_data_sum(hostname, data):
+    for port in data:
+        for status in data[port]:
+            value = data[port][status]
+            print "%s pgbouncer.stats[%s.%s] %s" \
+                   % (hostname, port, status, value)
 
 
 def main():
-    data = {}
+    data_by_user = {}
+    data_sum = {}
 
     for port in ports:
         rows = get_query(host, port, "SHOW SERVERS")
-        data[port] = get_data(rows)
+        data_by_user[port], data_sum[port] = get_data(rows)
 
-    zabbix_data(hostname, data)
-
+    if "--by-user" in sys.argv:
+        zabbix_data_by_user(hostname, data_by_user)
+    elif "--sum" in sys.argv:
+        zabbix_data_sum(hostname, data_sum)
+    else:
+        print "Need arguments"
+        print "     --by-user"
+        print "     --sum"
 
 if __name__ == "__main__":
     main()
